@@ -139,6 +139,10 @@ def query_codex(
 
     environment = os.environ.copy()
     environment["CODEX_HOME"] = codex_home
+    codex_bin_directory = os.path.dirname(os.path.abspath(codex_path))
+    environment["PATH"] = os.pathsep.join(
+        part for part in (codex_bin_directory, environment.get("PATH")) if part
+    )
     try:
         process = subprocess.Popen(
             [codex_path, "app-server"],

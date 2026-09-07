@@ -146,6 +146,48 @@ class QueryCodexTests(unittest.TestCase):
             with self.assertRaisesRegex(codex_usage.AdapterError, "timed out"):
                 codex_usage.query_codex(server, directory, 0.05)
 
+    def test_adds_codex_bin_directory_for_env_shebang(self):
+        with tempfile.TemporaryDirectory() as directory:
+            interpreter = Path(directory) / "codex-test-node"
+            interpreter.write_text(
+                "#!/usr/bin/python3\n"
+                + textwrap.dedent(
+                    """
+                    import json
+                    import sys
+
+                    for _ in range(3):
+                        sys.stdin.readline()
+                    print(json.dumps({
+                        "id": 2,
+                        "result": {
+                            "rateLimitsByLimitId": {
+                                "codex": {
+                                    "limitId": "codex",
+                                    "primary": {
+                                        "usedPercent": 25,
+                                        "windowDurationMins": 300,
+                                        "resetsAt": 1788808614,
+                                    },
+                                    "secondary": None,
+                                    "planType": "plus",
+                                }
+                            }
+                        },
+                    }), flush=True)
+                    sys.stdin.readline()
+                    """
+                )
+            )
+            interpreter.chmod(interpreter.stat().st_mode | stat.S_IXUSR)
+            server = Path(directory) / "codex"
+            server.write_text("#!/usr/bin/env codex-test-node\n")
+            server.chmod(server.stat().st_mode | stat.S_IXUSR)
+
+            result = codex_usage.query_codex(str(server), directory, 2)
+
+        self.assertEqual(result["shortWindow"]["usedPercent"], 25.0)
+
     def test_reports_a_missing_executable_without_leaking_its_path(self):
         with self.assertRaisesRegex(codex_usage.AdapterError, "not available") as raised:
             codex_usage.query_codex("/secret/path/to/codex", "/secret/home", 1)
