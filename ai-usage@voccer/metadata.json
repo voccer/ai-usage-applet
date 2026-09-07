@@ -1,0 +1,8 @@
+{
+    "uuid": "ai-usage@voccer",
+    "name": "AI Usage",
+    "description": "Display resilient Claude and Codex subscription usage",
+    "version": "1.0.0",
+    "author": "voccer; based on claude-usage@mtwebster",
+    "max-instances": 1
+}

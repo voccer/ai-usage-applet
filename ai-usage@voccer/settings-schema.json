@@ -1,0 +1,28 @@
+{
+    "update-interval": {
+        "type": "spinbutton",
+        "default": 5,
+        "min": 1,
+        "max": 60,
+        "step": 1,
+        "units": "minutes",
+        "description": "Update interval",
+        "tooltip": "Normal polling interval for Claude and Codex usage"
+    },
+    "claude-credentials-path": {
+        "type": "entry",
+        "default": "~/.claude/.credentials.json",
+        "description": "Claude credentials path",
+        "tooltip": "OAuth credentials maintained by Claude Code"
+    },
+    "codex-executable-path": {
+        "type": "entry",
+        "default": "/home/voccer/Desktop/shared/config/fnm/aliases/default/bin/codex",
+        "description": "Codex executable path"
+    },
+    "codex-home-path": {
+        "type": "entry",
+        "default": "/home/voccer/Desktop/shared/config/codex",
+        "description": "Codex configuration directory"
+    }
+}
