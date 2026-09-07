@@ -1,0 +1,1 @@
+{"id":2,"result":{"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":12.5,"windowDurationMins":300,"resetsAt":1788808614},"secondary":null,"planType":"pro"}},"accountId":"must-not-leak"}}

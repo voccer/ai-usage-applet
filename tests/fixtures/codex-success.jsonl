@@ -1,0 +1,3 @@
+{"id":0,"result":{"userAgent":"fixture","codexHome":"/tmp/codex"}}
+{"method":"remoteControl/status/changed","params":{"status":"disabled"}}
+{"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":48,"windowDurationMins":300,"resetsAt":1788808614},"secondary":{"usedPercent":47,"windowDurationMins":10080,"resetsAt":1789232801},"planType":"plus"},"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":48,"windowDurationMins":300,"resetsAt":1788808614},"secondary":{"usedPercent":47,"windowDurationMins":10080,"resetsAt":1789232801},"planType":"plus"}},"accountId":"must-not-leak"}}
