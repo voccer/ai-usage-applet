@@ -1,5 +1,5 @@
 const Applet = imports.ui.applet;
-const Cinnamon = imports.gi.Cinnamon;
+const Clutter = imports.gi.Clutter;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Soup = imports.gi.Soup;
@@ -47,6 +47,7 @@ AIUsageApplet.prototype = {
         this._codexFailures = 0;
         this._claudeNextAllowedAt = 0;
         this._codexNextAllowedAt = 0;
+        this._claudeRateLimitedUntil = 0;
         this._claudeInFlight = false;
         this._codexInFlight = false;
         this._claudeCancellable = null;
@@ -54,6 +55,7 @@ AIUsageApplet.prototype = {
         this._codexProcess = null;
         this._credentialMonitor = null;
         this._credentialFingerprint = null;
+        this._rejectedCredentialFingerprint = null;
         this._lastSuccessfulUpdate = null;
         this._settingsReady = false;
         this.claudeState = emptyState();
@@ -65,12 +67,21 @@ AIUsageApplet.prototype = {
         this._render();
 
         this.settings = new Settings.AppletSettings(this, UUID, instanceId);
+        this.settings.bind("enable-claude", "showClaude", this._onProvidersChanged.bind(this));
+        this.settings.bind("enable-codex", "showCodex", this._onProvidersChanged.bind(this));
         this.settings.bind("update-interval", "updateInterval", this._onIntervalChanged.bind(this));
         this.settings.bind("claude-credentials-path", "claudeCredentialsPath", this._onClaudePathChanged.bind(this));
         this.settings.bind("codex-executable-path", "codexExecutablePath", this._onCodexPathChanged.bind(this));
         this.settings.bind("codex-home-path", "codexHomePath", this._onCodexPathChanged.bind(this));
+        this.settings.bind("claude-desktop-entry", "claudeDesktopEntry");
+        this.settings.bind("codex-desktop-entry", "codexDesktopEntry");
 
         this._settingsReady = true;
+        // _buildPanel/_render above ran before these bindings existed, so they
+        // assumed both providers were enabled. Re-render now that the real
+        // values are known: a disabled provider never polls, and polling is
+        // otherwise the only thing that repaints the panel.
+        this._render();
         this._setupCredentialMonitor();
         this._scheduleInitialRefresh();
         global.log(UUID + ": initialized");
@@ -79,12 +90,6 @@ AIUsageApplet.prototype = {
     _buildPanel: function() {
         this.setAllowedLayout(Applet.AllowedLayout.BOTH);
 
-        this._icon = new St.Icon({
-            icon_name: "icon-symbolic",
-            icon_type: St.IconType.SYMBOLIC,
-            icon_size: 16,
-            style_class: "applet-icon"
-        });
         this._claudeLabel = new St.Label({
             text: "Claude --⚠",
             style_class: "ai-usage-provider usage-warning"
@@ -97,11 +102,104 @@ AIUsageApplet.prototype = {
             text: "Codex --⚠",
             style_class: "ai-usage-provider usage-warning"
         });
+        this._disabledLabel = new St.Label({
+            text: "AI Usage off",
+            style_class: "ai-usage-disabled"
+        });
 
-        this.actor.add(this._icon, {y_align: St.Align.MIDDLE, y_fill: false});
+        this._makeProviderClickable(this._claudeLabel, "claude");
+        this._makeProviderClickable(this._codexLabel, "codex");
+
         this.actor.add(this._claudeLabel, {y_align: St.Align.MIDDLE, y_fill: false});
         this.actor.add(this._separatorLabel, {y_align: St.Align.MIDDLE, y_fill: false});
         this.actor.add(this._codexLabel, {y_align: St.Align.MIDDLE, y_fill: false});
+        this.actor.add(this._disabledLabel, {y_align: St.Align.MIDDLE, y_fill: false});
+        this._alignTooltipLeft();
+    },
+
+    // Each reading is its own click target: left-click opens that provider's
+    // desktop app, middle-click refreshes just that provider. Right-click is
+    // deliberately propagated so Cinnamon's panel menu still works.
+    _makeProviderClickable: function(label, provider) {
+        label.reactive = true;
+        label.track_hover = true;
+        label.connect("button-press-event", function(actor, event) {
+            var action = Usage.clickAction(event.get_button());
+            if (action === "open") {
+                this._openDesktopApp(provider);
+                return Clutter.EVENT_STOP;
+            }
+            if (action === "refresh") {
+                this._refreshProvider(provider);
+                return Clutter.EVENT_STOP;
+            }
+            return Clutter.EVENT_PROPAGATE;
+        }.bind(this));
+    },
+
+    _refreshProvider: function(provider) {
+        if (provider === "claude") {
+            this._pollClaude(false);
+        } else {
+            this._pollCodex(false);
+        }
+    },
+
+    _desktopEntryFor: function(provider) {
+        return provider === "claude" ? this.claudeDesktopEntry : this.codexDesktopEntry;
+    },
+
+    // Launching through the desktop entry rather than a raw command keeps
+    // startup notification and single-instance focusing intact.
+    _openDesktopApp: function(provider) {
+        var entry = this._desktopEntryFor(provider);
+        if (!entry) {
+            global.logError(UUID + ": no desktop entry configured for " + provider);
+            this._refreshProvider(provider);
+            return;
+        }
+
+        var appInfo = null;
+        try {
+            appInfo = Gio.DesktopAppInfo.new(entry);
+        } catch (error) {
+            appInfo = null;
+        }
+        if (!appInfo) {
+            global.logError(UUID + ": desktop entry not found for " + provider);
+            this._refreshProvider(provider);
+            return;
+        }
+
+        try {
+            appInfo.launch([], global.create_app_launch_context());
+        } catch (error) {
+            global.logError(UUID + ": failed to launch the " + provider + " desktop app");
+        }
+    },
+
+    // Themes commonly center #Tooltip (Mint-Y does), which makes every row of
+    // the detail table drift by half the difference in its rendered width.
+    // The table only reads correctly left-aligned. The face is set here rather
+    // than in stylesheet.css because the tooltip actor is not a child of the
+    // applet and so is out of that stylesheet's reach.
+    _alignTooltipLeft: function() {
+        try {
+            var label = this._applet_tooltip && this._applet_tooltip._tooltip;
+            if (label) {
+                label.set_style("text-align: left; font-family: Inter, sans-serif;");
+            }
+        } catch (error) {
+            global.logError(UUID + ": unable to style the tooltip");
+        }
+    },
+
+    _claudeEnabled: function() {
+        return this.showClaude !== false;
+    },
+
+    _codexEnabled: function() {
+        return this.showCodex !== false;
     },
 
     _now: function() {
@@ -229,6 +327,14 @@ AIUsageApplet.prototype = {
     },
 
     _render: function() {
+        var claudeEnabled = this._claudeEnabled();
+        var codexEnabled = this._codexEnabled();
+
+        this._claudeLabel.visible = claudeEnabled;
+        this._codexLabel.visible = codexEnabled;
+        this._separatorLabel.visible = claudeEnabled && codexEnabled;
+        this._disabledLabel.visible = !claudeEnabled && !codexEnabled;
+
         this._claudeLabel.set_text(Usage.panelProviderText("Claude", this.claudeState));
         this._codexLabel.set_text(Usage.panelProviderText("Codex", this.codexState));
         this._setLabelClass(this._claudeLabel, Usage.usageColor(
@@ -240,8 +346,11 @@ AIUsageApplet.prototype = {
             this.codexState.status
         ));
         this.set_applet_tooltip(
-            Usage.tooltipText(this.claudeState, this.codexState, this._lastSuccessfulUpdate) +
-            "\n\nClick to refresh eligible providers"
+            Usage.tooltipText(this.claudeState, this.codexState, this._lastSuccessfulUpdate, {
+                claudeEnabled: claudeEnabled,
+                codexEnabled: codexEnabled
+            }),
+            true
         );
     },
 
@@ -323,12 +432,13 @@ AIUsageApplet.prototype = {
     },
 
     _pollClaude: function(force) {
-        if (this._removed || this._claudeInFlight) {
+        if (this._removed || this._claudeInFlight || !this._claudeEnabled()) {
             return;
         }
         var now = this._now();
-        if (!force && now < this._claudeNextAllowedAt) {
-            this._scheduleClaude(this._claudeNextAllowedAt - now);
+        if (!Usage.canPoll(force, now, this._claudeNextAllowedAt, this._claudeRateLimitedUntil)) {
+            var wait = Math.max(this._claudeNextAllowedAt, this._claudeRateLimitedUntil) - now;
+            this._scheduleClaude(Math.max(1, wait));
             return;
         }
 
@@ -342,10 +452,18 @@ AIUsageApplet.prototype = {
 
         if (credentials.fingerprint !== this._credentialFingerprint) {
             this._credentialFingerprint = credentials.fingerprint;
+            this._rejectedCredentialFingerprint = null;
             this._claudeFailures = 0;
             this._claudeNextAllowedAt = 0;
         }
         if (credentials.expiresAt && credentials.expiresAt <= GLib.get_real_time() / 1000) {
+            this._claudeAuthRequired();
+            return;
+        }
+        if (!Usage.credentialCanRetry(
+            credentials.fingerprint,
+            this._rejectedCredentialFingerprint
+        )) {
             this._claudeAuthRequired();
             return;
         }
@@ -417,6 +535,8 @@ AIUsageApplet.prototype = {
                 };
                 this._claudeFailures = 0;
                 this._claudeNextAllowedAt = 0;
+                this._claudeRateLimitedUntil = 0;
+                this._rejectedCredentialFingerprint = null;
                 this._lastSuccessfulUpdate = this.claudeState.updatedAt;
                 this._saveCache();
                 this._render();
@@ -430,6 +550,7 @@ AIUsageApplet.prototype = {
 
         if (status === 401) {
             global.log(UUID + ": Claude OAuth sign-in required");
+            this._rejectedCredentialFingerprint = this._credentialFingerprint;
             this._claudeAuthRequired();
             return;
         }
@@ -443,6 +564,7 @@ AIUsageApplet.prototype = {
                 delay = Usage.retryDelaySeconds(this._claudeFailures);
             }
             this._claudeNextAllowedAt = this._now() + Math.max(1, delay);
+            this._claudeRateLimitedUntil = this._claudeNextAllowedAt;
             this.claudeState.status = "rate_limited";
             this._render();
             this._scheduleClaude(delay);
@@ -515,12 +637,12 @@ AIUsageApplet.prototype = {
     },
 
     _pollCodex: function(force) {
-        if (this._removed || this._codexInFlight) {
+        if (this._removed || this._codexInFlight || !this._codexEnabled()) {
             return;
         }
         var now = this._now();
-        if (!force && now < this._codexNextAllowedAt) {
-            this._scheduleCodex(this._codexNextAllowedAt - now);
+        if (!Usage.canPoll(force, now, this._codexNextAllowedAt, 0)) {
+            this._scheduleCodex(Math.max(1, this._codexNextAllowedAt - now));
             return;
         }
 
@@ -620,6 +742,31 @@ AIUsageApplet.prototype = {
         this.codexState.status = "unavailable";
         this._render();
         this._scheduleCodex(delay);
+    },
+
+    _onProvidersChanged: function() {
+        if (!this._settingsReady) {
+            return;
+        }
+
+        if (this._claudeEnabled()) {
+            this._claudeNextAllowedAt = 0;
+            this._pollClaude(true);
+        } else {
+            this._clearTimer("_claudeTimer");
+            this._clearTimer("_credentialDebounceTimer");
+            this._claudeFailures = 0;
+        }
+
+        if (this._codexEnabled()) {
+            this._codexNextAllowedAt = 0;
+            this._pollCodex(true);
+        } else {
+            this._clearTimer("_codexTimer");
+            this._codexFailures = 0;
+        }
+
+        this._render();
     },
 
     _onIntervalChanged: function() {

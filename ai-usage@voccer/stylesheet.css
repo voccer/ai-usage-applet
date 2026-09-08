@@ -1,10 +1,16 @@
 .ai-usage-provider {
     padding: 0 3px;
+    font-feature-settings: "tnum";
 }
 
 .ai-usage-separator {
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.35);
     padding: 0 1px;
+}
+
+.ai-usage-disabled {
+    color: rgba(255, 255, 255, 0.45);
+    padding: 0 4px;
 }
 
 .usage-good {
