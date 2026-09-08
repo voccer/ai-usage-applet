@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Render the panel one step below Cinnamon's `applet-label` size (`0.9em`).
+  At the stock 1em this applet reads as oversized next to a clock, because it
+  carries several times as much text at the same size.
+
+- Split each panel reading into a name label and a value label so a cramped
+  panel ellipsizes the provider name instead of the percentage. Previously the
+  whole reading was one label that ellipsized from the end, hiding the number
+  and keeping the word.
+
 - Derive all secondary tooltip text from the theme's own tooltip colour instead
   of fixed greys, so the detail table stays readable on themes other than
   Mint-Y-Dark-Grey.

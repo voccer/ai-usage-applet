@@ -7,8 +7,15 @@ usage together:
 Claude 35% · Codex 48%
 ```
 
+The panel renders at `0.9em`, one step below Cinnamon's `applet-label` size,
+set in `stylesheet.css`. The hover table is separate and follows the theme.
+
 The panel shows each enabled provider's short window and nothing else — no
-icon. Hovering opens an aligned detail table:
+icon. Each reading is two labels, and only the name may ellipsize: when the
+panel runs short of room it gives up `Claude` before it gives up `34%`, because
+the number is the part worth reading. A very cramped panel therefore shows
+`… 34% · … 0%` — the leftover ellipsis is the cost of keeping the name in the
+layout, which is what lets it come back when the panel has room again. Hovering opens an aligned detail table:
 
 ```text
 Claude

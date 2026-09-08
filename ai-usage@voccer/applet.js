@@ -1,5 +1,6 @@
 const Applet = imports.ui.applet;
 const Clutter = imports.gi.Clutter;
+const Pango = imports.gi.Pango;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Soup = imports.gi.Soup;
@@ -90,18 +91,14 @@ AIUsageApplet.prototype = {
     _buildPanel: function() {
         this.setAllowedLayout(Applet.AllowedLayout.BOTH);
 
-        this._claudeLabel = new St.Label({
-            text: "Claude --⚠",
-            style_class: "ai-usage-provider usage-warning"
-        });
+        this._claude = this._buildReading("Claude");
+        this._claudeLabel = this._claude.box;
         this._separatorLabel = new St.Label({
             text: "·",
             style_class: "ai-usage-separator"
         });
-        this._codexLabel = new St.Label({
-            text: "Codex --⚠",
-            style_class: "ai-usage-provider usage-warning"
-        });
+        this._codex = this._buildReading("Codex");
+        this._codexLabel = this._codex.box;
         this._disabledLabel = new St.Label({
             text: "AI Usage off",
             style_class: "ai-usage-disabled"
@@ -115,6 +112,29 @@ AIUsageApplet.prototype = {
         this.actor.add(this._codexLabel, {y_align: St.Align.MIDDLE, y_fill: false});
         this.actor.add(this._disabledLabel, {y_align: St.Align.MIDDLE, y_fill: false});
         this._alignTooltipLeft();
+    },
+
+    // A reading is two labels, not one string. Only the name may ellipsize, so
+    // its minimum width collapses to nothing while the number keeps its natural
+    // width -- a cramped panel then drops "Claude" and still shows "35%". As one
+    // label the whole thing ellipsized from the end, losing the number first.
+    _buildReading: function(name) {
+        var box = new St.BoxLayout({style_class: "ai-usage-provider"});
+        var nameLabel = new St.Label({
+            text: name,
+            style_class: "ai-usage-name"
+        });
+        var valueLabel = new St.Label({
+            text: "--⚠",
+            style_class: "ai-usage-value"
+        });
+
+        nameLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        valueLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+
+        box.add(nameLabel, {y_align: St.Align.MIDDLE, y_fill: false, expand: true});
+        box.add(valueLabel, {y_align: St.Align.MIDDLE, y_fill: false, expand: false});
+        return {box: box, name: nameLabel, value: valueLabel};
     },
 
     // Each reading is its own click target: left-click opens that provider's
@@ -319,11 +339,14 @@ AIUsageApplet.prototype = {
         }
     },
 
-    _setLabelClass: function(label, className) {
-        for (var index = 0; index < STATUS_CLASSES.length; index += 1) {
-            label.remove_style_class_name(STATUS_CLASSES[index]);
+    _setLabelClass: function(reading, className) {
+        var labels = [reading.name, reading.value];
+        for (var label = 0; label < labels.length; label += 1) {
+            for (var index = 0; index < STATUS_CLASSES.length; index += 1) {
+                labels[label].remove_style_class_name(STATUS_CLASSES[index]);
+            }
+            labels[label].add_style_class_name(className);
         }
-        label.add_style_class_name(className);
     },
 
     _render: function() {
@@ -335,13 +358,17 @@ AIUsageApplet.prototype = {
         this._separatorLabel.visible = claudeEnabled && codexEnabled;
         this._disabledLabel.visible = !claudeEnabled && !codexEnabled;
 
-        this._claudeLabel.set_text(Usage.panelProviderText("Claude", this.claudeState));
-        this._codexLabel.set_text(Usage.panelProviderText("Codex", this.codexState));
-        this._setLabelClass(this._claudeLabel, Usage.usageColor(
+        var claudeParts = Usage.panelProviderParts("Claude", this.claudeState);
+        var codexParts = Usage.panelProviderParts("Codex", this.codexState);
+        this._claude.name.set_text(claudeParts.name);
+        this._claude.value.set_text(claudeParts.value);
+        this._codex.name.set_text(codexParts.name);
+        this._codex.value.set_text(codexParts.value);
+        this._setLabelClass(this._claude, Usage.usageColor(
             this.claudeState.shortWindow && this.claudeState.shortWindow.usedPercent,
             this.claudeState.status
         ));
-        this._setLabelClass(this._codexLabel, Usage.usageColor(
+        this._setLabelClass(this._codex, Usage.usageColor(
             this.codexState.shortWindow && this.codexState.shortWindow.usedPercent,
             this.codexState.status
         ));

@@ -53,18 +53,24 @@ assertEqual(Usage.formatDuration(10080), "7d", "seven-day window");
 assertEqual(Usage.formatDuration(90), "1h 30m", "mixed duration");
 assertEqual(Usage.formatDuration(45), "45m", "minute duration");
 
-assertEqual(Usage.panelProviderText("Claude", {
+// The panel splits each reading in two so a cramped panel can drop the name
+// and keep the number, instead of ellipsizing "Claude 35%" down to "Claude".
+var parts = Usage.panelProviderParts("Claude", {
     shortWindow: {usedPercent: 34.6},
     status: "fresh"
-}), "Claude 35%", "percentage is rounded");
-assertEqual(Usage.panelProviderText("Claude", {
+});
+assertEqual(parts.name, "Claude", "the name is its own part");
+assertEqual(parts.value, "35%", "percentage is rounded");
+
+parts = Usage.panelProviderParts("Claude", {
     shortWindow: {usedPercent: 35},
     status: "rate_limited"
-}), "Claude 35%⚠", "degraded data stays visible");
-assertEqual(Usage.panelProviderText("Codex", {
-    shortWindow: null,
-    status: "unavailable"
-}), "Codex --⚠", "missing degraded data is explicit");
+});
+assertEqual(parts.value, "35%⚠", "the degraded marker rides with the number");
+assertEqual(parts.name, "Claude", "a degraded provider keeps its name");
+
+parts = Usage.panelProviderParts("Codex", {shortWindow: null, status: "unavailable"});
+assertEqual(parts.value, "--⚠", "missing degraded data is explicit");
 
 assertEqual(Usage.usageColor(69.9, "fresh"), "usage-good", "low usage is green");
 assertEqual(Usage.usageColor(70, "fresh"), "usage-warning", "medium usage is yellow");

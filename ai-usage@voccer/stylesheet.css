@@ -1,16 +1,33 @@
+/* Cinnamon's applet-label renders at 1em (16.666px here, same as the clock).
+ * This applet shows far more text than a clock, so it reads as oversized at
+ * that size; one step down sits between the panel base and the window-list
+ * buttons. Kept relative so it still tracks the desktop font and DPI. */
 .ai-usage-provider {
     padding: 0 3px;
+    font-size: 0.9em;
+}
+
+/* The name gives up its space first: no minimum, and a gap that belongs to it
+ * rather than to the number, so the number sits flush when the name is gone. */
+.ai-usage-name {
+    min-width: 0;
+    padding-right: 4px;
+}
+
+.ai-usage-value {
     font-feature-settings: "tnum";
 }
 
 .ai-usage-separator {
     color: rgba(255, 255, 255, 0.35);
     padding: 0 1px;
+    font-size: 0.9em;
 }
 
 .ai-usage-disabled {
     color: rgba(255, 255, 255, 0.45);
     padding: 0 4px;
+    font-size: 0.9em;
 }
 
 .usage-good {

@@ -1,6 +1,6 @@
 /* exported retryDelaySeconds, parseRetryAfter, credentialCanRetry,
  * formatDuration, formatClock, usageBar, clickAction, canPoll,
- * panelProviderText, usageColor, tooltipText */
+ * panelProviderParts, usageColor, tooltipText */
 
 const GLib = imports.gi.GLib;
 
@@ -177,15 +177,17 @@ function _isDegraded(status) {
     return status !== "fresh";
 }
 
-function panelProviderText(name, state) {
-    var text = name + " --";
+// Returned as two parts because the panel renders them as two labels: only the
+// name may ellipsize, so a cramped panel loses "Claude" before it loses "35%".
+function panelProviderParts(name, state) {
+    var value = "--";
     if (state && state.shortWindow && typeof state.shortWindow.usedPercent === "number") {
-        text = name + " " + String(Math.round(state.shortWindow.usedPercent)) + "%";
+        value = String(Math.round(state.shortWindow.usedPercent)) + "%";
     }
     if (!state || _isDegraded(state.status)) {
-        text += "⚠";
+        value += "⚠";
     }
-    return text;
+    return {name: name, value: value};
 }
 
 function usageColor(percent, status) {
