@@ -37,8 +37,7 @@ find_codex() {
     local candidate
     for candidate in \
         "${CODEX_BIN:-}" \
-        "$HOME/Desktop/shared/config/fnm/aliases/default/bin/codex" \
-        "$HOME/.local/share/fnm/aliases/default/bin/codex" \
+        "${FNM_DIR:-$HOME/.local/share/fnm}/aliases/default/bin/codex" \
         "$HOME/.local/bin/codex" \
         /usr/local/bin/codex \
         /usr/bin/codex
@@ -47,15 +46,18 @@ find_codex() {
     done
 
     candidate="$(command -v codex 2>/dev/null || true)"
+    # A multishell hit still names a real install: resolve the shell-local
+    # directory to the node-versions one it points at, which outlives the shell.
     case "$candidate" in
-        ""|/run/user/*) return 1 ;;
-        *) printf '%s' "$candidate"; return 0 ;;
+        /run/user/*) candidate="$(readlink -f "${candidate%/bin/codex}" || true)/bin/codex" ;;
     esac
+    [ -n "$candidate" ] && [ -x "$candidate" ] && { printf '%s' "$candidate"; return 0; }
+    return 1
 }
 
 find_codex_home() {
     local candidate
-    for candidate in "${CODEX_HOME:-}" "$HOME/Desktop/shared/config/codex" "$HOME/.codex"; do
+    for candidate in "${CODEX_HOME:-}" "$HOME/.codex"; do
         [ -n "$candidate" ] && [ -d "$candidate" ] && { printf '%s' "$candidate"; return 0; }
     done
     return 1

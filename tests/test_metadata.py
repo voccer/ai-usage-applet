@@ -47,7 +47,7 @@ class MetadataTests(unittest.TestCase):
         )
         self.assertEqual(
             settings["codex-desktop-entry"]["default"],
-            "codex-desktop.desktop",
+            "chatgpt.desktop",
         )
 
     def test_no_default_hardcodes_one_machine(self):

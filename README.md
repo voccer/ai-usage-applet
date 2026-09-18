@@ -104,13 +104,13 @@ token or account ID is stored there.
   panel edit mode.
 - Claude desktop entry / Codex desktop entry: which `.desktop` file each
   reading launches, defaulting to `com.anthropic.Claude.desktop` and
-  `codex-desktop.desktop`. If the entry is missing the click falls back to
+  `chatgpt.desktop`. If the entry is missing the click falls back to
   refreshing that provider.
 - Update interval: 5 minutes by default.
 - Claude credentials path: `~/.claude/.credentials.json`.
-- Codex executable: `~/Desktop/shared/config/fnm/aliases/default/bin/codex`.
+- Codex executable: `~/.local/share/fnm/aliases/default/bin/codex`.
   Must be a stable path — see "Moving to another machine".
-- Codex home: `~/Desktop/shared/config/codex`.
+- Codex home: `~/.codex`.
 
 ## Install
 
@@ -154,7 +154,7 @@ things:
 3. **A Claude Code login**, since the applet reads the OAuth token Claude Code
    maintains at `~/.claude/.credentials.json` and never refreshes it itself.
 4. **The desktop entries**, if you want click-to-open: `com.anthropic.Claude.desktop`
-   and `codex-desktop.desktop` must exist, or the click falls back to refreshing.
+   and `chatgpt.desktop` must exist, or the click falls back to refreshing.
 
 Settings defaults are written `~`-relative and expanded at read time, so they do
 not carry one user's home directory to another machine. A settings instance

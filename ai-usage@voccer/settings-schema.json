@@ -49,20 +49,20 @@
     },
     "codex-executable-path": {
         "type": "entry",
-        "default": "~/Desktop/shared/config/fnm/aliases/default/bin/codex",
+        "default": "~/.local/share/fnm/aliases/default/bin/codex",
         "description": "Codex executable path",
         "dependency": "enable-codex",
         "tooltip": "Must be a stable path. Do not use the output of `which codex` under fnm: that is an ephemeral /run/user/... multishell path that dies with the shell."
     },
     "codex-home-path": {
         "type": "entry",
-        "default": "~/Desktop/shared/config/codex",
+        "default": "~/.codex",
         "description": "Codex configuration directory",
         "dependency": "enable-codex"
     },
     "codex-desktop-entry": {
         "type": "entry",
-        "default": "codex-desktop.desktop",
+        "default": "chatgpt.desktop",
         "description": "Codex desktop entry",
         "tooltip": "Desktop entry launched when the Codex reading is clicked",
         "dependency": "enable-codex"
